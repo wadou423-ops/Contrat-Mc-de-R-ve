@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon MC de Rêve — Contrats</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,300..600,0..1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#9f402d;
+    --primary-light:#e2725b;
+    --primary-tint:#fdece7;
+    --ink:#1b1c1b;
+    --ink-soft:#5e4d49;
+    --bg:#fbf9f7;
+    --surface:#ffffff;
+    --surface-alt:#f5f2f0;
+    --border:#e6ddd8;
+    --success:#006b5b;
+    --success-tint:#dcf1ec;
+    --draft:#5e5e5e;
+    --draft-tint:#ececea;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Hanken Grotesk', sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.serif{font-family:'Playfair Display', serif;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 22; font-size:20px; line-height:1;}
+
+  .shell{max-width:900px;margin:0 auto;padding-bottom:60px;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;background:var(--bg);position:sticky;top:0;z-index:20;
+    border-bottom:1px solid var(--border);
+  }
+  .topbar .left{display:flex;align-items:center;gap:12px;}
+  .backbtn{
+    display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+    border-radius:50%;border:none;background:transparent;cursor:pointer;color:var(--primary);
+  }
+  .backbtn:hover{background:var(--surface-alt);}
+  .brand{font-family:'Playfair Display',serif;font-weight:700;font-size:19px;color:var(--primary);letter-spacing:.2px;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--primary-tint);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+
+  .content{padding:24px 20px 0;}
+
+  /* ---- Dashboard ---- */
+  .page-title{font-size:28px;font-weight:700;margin:4px 0 4px;}
+  .page-sub{color:var(--ink-soft);font-size:14.5px;margin:0 0 22px;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:10px;padding:13px 20px;font-size:15px;font-weight:600;
+    cursor:pointer;font-family:'Hanken Grotesk',sans-serif;transition:background .15s, transform .1s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:#84341f;}
+  .btn-success{background:var(--success);color:#fff;}
+  .btn-success:hover{background:#00544a;}
+  .btn-success:disabled{background:#a9c9c3;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--primary);border:1.5px solid var(--primary);}
+  .btn-ghost:hover{background:var(--primary-tint);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 14px;font-size:13px;}
+
+  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:26px;}
+  .stat-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .stat-top{display:flex;align-items:flex-start;justify-content:space-between;}
+  .stat-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);}
+  .stat-value{font-size:26px;font-weight:700;font-family:'Playfair Display',serif;}
+  .stat-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .stat-icon.pending{background:var(--primary-tint);color:var(--primary);}
+  .stat-icon.signed{background:var(--success-tint);color:var(--success);}
+  .stat-icon.draft{background:var(--draft-tint);color:var(--draft);}
+
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;}
+  .section-head h2{font-size:21px;margin:0;font-weight:700;}
+  .link-plain{color:var(--primary);font-size:13.5px;font-weight:600;text-decoration:none;cursor:pointer;background:none;border:none;font-family:inherit;}
+
+  .list-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .list-row{
+    display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer;
+    border-bottom:1px solid var(--border);
+  }
+  .list-row:last-child{border-bottom:none;}
+  .list-row:hover{background:var(--surface-alt);}
+  .row-icon{width:38px;height:38px;border-radius:10px;background:var(--surface-alt);display:flex;align-items:center;justify-content:center;color:var(--ink-soft);flex-shrink:0;}
+  .row-main{flex:1;min-width:0;}
+  .row-title{font-weight:600;font-size:14.5px;margin:0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row-sub{font-size:12.5px;color:var(--ink-soft);margin:0;}
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:99px;
+    font-size:11.5px;font-weight:700;letter-spacing:.02em;flex-shrink:0;white-space:nowrap;
+  }
+  .badge.pending{background:var(--primary-tint);color:var(--primary);}
+  .badge.signed{background:var(--success-tint);color:var(--success);}
+  .badge.draft{background:var(--draft-tint);color:var(--draft);}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .empty{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:14px;}
+
+  /* ---- Forms ---- */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px 22px;margin-bottom:20px;}
+  label{display:block;font-size:13px;font-weight:600;color:var(--ink);margin:16px 0 7px;}
+  label:first-of-type{margin-top:0;}
+  .field-wrap{position:relative;}
+  .field-wrap .material-symbols-outlined{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:19px;}
+  input[type=text],input[type=number]{
+    width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--border);border-radius:10px;
+    font-size:15px;background:var(--surface-alt);color:var(--ink);font-family:inherit;
+  }
+  input:focus{outline:none;border-color:var(--primary);background:#fff;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .hint{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .divider{height:1px;background:var(--border);margin:22px 0;}
+  .trust{
+    display:flex;align-items:center;gap:12px;background:var(--surface-alt);border-radius:12px;
+    padding:13px 15px;margin-top:18px;
+  }
+  .trust .ic{width:32px;height:32px;border-radius:50%;background:var(--primary-tint);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .trust b{display:block;font-size:12.5px;}
+  .trust span{font-size:12px;color:var(--ink-soft);}
+
+  .sig-tabs{display:flex;gap:8px;margin-top:16px;}
+  .sig-tab{flex:1;padding:10px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface-alt);font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft);}
+  .sig-tab.active{border-color:var(--primary);color:var(--primary);background:var(--primary-tint);}
+  .sig-pane{display:none;margin-top:12px;}
+  .sig-pane.active{display:block;}
+  canvas.pad{width:100%;height:140px;border:1.5px dashed var(--border);border-radius:10px;background:#fff;touch-action:none;}
+  .sig-actions{display:flex;gap:10px;margin-top:8px;justify-content:flex-end;}
+  .typed-sig-input{
+    width:100%;padding:16px 12px;border:1.5px dashed var(--border);border-radius:10px;
+    font-family:'Playfair Display',serif;font-style:italic;font-size:28px;color:var(--ink);background:#fff;
+  }
+  .banner{padding:12px 14px;border-radius:10px;font-size:13.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .banner.ok{background:var(--success-tint);color:var(--success);}
+  .banner.warn{background:var(--primary-tint);color:var(--primary);}
+  .banner.err{background:#fbe4e1;color:#a33025;}
+  .linkbox{
+    display:flex;gap:8px;background:var(--surface-alt);border:1.5px dashed var(--border);
+    border-radius:10px;padding:11px 13px;align-items:center;margin:14px 0;font-size:12.5px;
+    word-break:break-all;color:var(--ink-soft);
+  }
+  .copybtn{flex-shrink:0;background:var(--ink);color:#fff;border:none;border-radius:7px;padding:8px 11px;font-size:12px;cursor:pointer;}
+  .stack{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+  .btn.wa{background:#25D366;color:#fff;}
+  .btn.wa:hover{background:#1fb659;}
+
+  /* ---- Contract view chrome ---- */
+  .ref-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+  .ref-code{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;}
+  .doc-frame{background:var(--surface-alt);border-radius:16px;padding:14px;margin-bottom:20px;}
+
+  /* ---- Client success / espace client ---- */
+  .success-hero{text-align:center;padding:30px 10px 6px;}
+  .success-check{
+    width:58px;height:58px;border-radius:50%;background:var(--success-tint);color:var(--success);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+  }
+  .success-check .material-symbols-outlined{font-size:32px;}
+  .success-hero h2{margin:0 0 6px;font-size:23px;}
+  .success-hero p{color:var(--ink-soft);font-size:14px;margin:0 auto;max-width:340px;}
+
+  /* ================= CONTRACT DOCUMENT — VISUEL INCHANGÉ ================= */
+  .pages-wrap{overflow:hidden;}
+  .page-scaler{transform-origin:top left;}
+  .page{
+    width:794px;min-height:1123px;background:#fff;position:relative;
+    font-family:'Segoe UI', Arial, sans-serif;color:#1a1a1a;
+    border:1px solid #e4dcd3;
+  }
+  .page + .page{margin-top:18px;}
+  .p-header{background:#c96b47;color:#fff;text-align:center;padding:34px 20px 30px;}
+  .p-header .mono{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:18px;}
+  .p-header h1{margin:0;font-size:34px;letter-spacing:1px;font-weight:800;font-family:'Segoe UI',Arial,sans-serif;}
+  .p-title{text-align:center;padding:22px 20px 18px;}
+  .p-title h2{margin:0 0 6px;color:#c0392b;font-size:24px;font-weight:800;font-family:'Segoe UI',Arial,sans-serif;}
+  .p-title .subtitle{letter-spacing:5px;font-size:13px;color:#222;font-weight:600;}
+  .p-body{padding:6px 44px 30px;font-size:13.5px;line-height:1.55;}
+  .parties{display:flex;justify-content:space-between;gap:20px;margin:14px 0 18px;}
+  .parties .col{width:47%;font-size:13.5px;line-height:1.5;}
+  .parties b{display:block;}
+  .page .divider{height:2px;background:#c0392b;margin:18px 0;border-radius:0;}
+  h3.art{color:#1a1a1a;font-size:15px;margin:22px 0 8px;font-weight:800;font-family:'Segoe UI',Arial,sans-serif;}
+  .p-body p{margin:8px 0;text-align:justify;}
+  .p-body ul{margin:6px 0;padding-left:20px;}
+  .p-body li{margin:4px 0;}
+  .fillblank{border-bottom:1.5px solid #999;padding:0 3px;font-weight:700;color:#c0392b;}
+  .sign-block{display:flex;justify-content:space-between;margin-top:26px;gap:24px;}
+  .sign-col{width:47%;}
+  .sign-col .label{font-weight:700;font-size:13.5px;margin-bottom:4px;}
+  .sign-col .note{font-size:11px;color:#777;margin-bottom:10px;}
+  .sign-img{height:70px;max-width:100%;object-fit:contain;}
+  .sign-typed{font-family:'Segoe Script','Brush Script MT',cursive;font-size:26px;padding-top:10px;}
+  .faitle{text-align:center;font-weight:800;margin:26px 0 4px;font-size:14px;}
+  .p-footer{
+    position:absolute;bottom:0;left:0;right:0;background:#1a1a1a;color:#fff;
+    display:flex;align-items:center;justify-content:space-between;padding:14px 34px;font-size:12.5px;
+  }
+  .p-footer .flogo{display:flex;align-items:center;gap:8px;}
+  .p-footer .fdot{width:22px;height:22px;border-radius:50%;background:#c96b47;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;}
+  /* ================= FIN BLOC DOCUMENT INCHANGÉ ================= */
+
+  @media(max-width:520px){
+    .stats-grid{grid-template-columns:1fr 1fr;}
+    .row2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="left">
+      <button class="backbtn" id="back-btn" style="display:none;" aria-label="Retour">
+        <span class="material-symbols-outlined">arrow_back</span>
+      </button>
+      <span class="brand">Mon MC de Rêve</span>
+    </div>
+    <div class="avatar">CP</div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<script>
+/* ================= CONSTANTES ================= */
+const PRESTATAIRE_NOM = "Jean Jaurès NOGBOU, Maître de cérémonie";
+const CONTACT_TEL = "+225 07 491 471 73 / +225 07 482 156 05";
+const CONTACT_MAIL = "creativeplanner03@gmail.com";
+
+const SUPABASE_URL = "https://mbfgccqeuhnacyueoani.supabase.co";
+const SUPABASE_KEY = "sb_publishable_tIbcG-hbvNUop9Wy0TAixg_da9y5ox8";
+const SUPABASE_TABLE = "cp_contracts";
+
+/* ================= UTILITAIRES ================= */
+function genId(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
+function fcfa(n){ n = Number(n)||0; return n.toLocaleString('fr-FR') + ' FCFA'; }
+function pad2(v){ v = (v||'').toString(); return v.length===1 ? '0'+v : (v||'__'); }
+function getParam(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
+function shareLink(id){ const url = new URL(window.location.href); url.search=''; url.searchParams.set('id', id); return url.toString(); }
+function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}); }
+function refCode(id){ return 'MC-' + (id||'').slice(0,6).toUpperCase(); }
+
+/* ================= ROUTER ================= */
+function go(params){
+  const url = new URL(window.location.href);
+  url.search = '';
+  Object.entries(params).forEach(([k,v])=>{ if(v!=null && v!=='') url.searchParams.set(k,v); });
+  history.pushState({}, '', url);
+  route();
+}
+window.addEventListener('popstate', route);
+
+function route(){
+  const id = getParam('id');
+  const view = getParam('view');
+  const admin = getParam('admin') === '1';
+  const backBtn = document.getElementById('back-btn');
+  if(id){
+    backBtn.style.display = admin ? 'flex' : 'none';
+    renderContractView(id, admin);
+  } else if(view === 'new'){
+    backBtn.style.display = 'flex';
+    renderCreate(getParam('edit'));
+  } else if(view === 'list'){
+    backBtn.style.display = 'flex';
+    renderList();
+  } else {
+    backBtn.style.display = 'none';
+    renderDashboard();
+  }
+}
+document.getElementById('back-btn').addEventListener('click', ()=> go({}));
+
+/* ================= STORAGE (Supabase REST) ================= */
+async function saveContract(id, data){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify([{ id, data }])
+    });
+    return res.ok;
+  }catch(e){ return false; }
+}
+async function loadContract(id){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}&select=data`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if(!res.ok) return null;
+    const rows = await res.json();
+    return rows && rows[0] ? rows[0].data : null;
+  }catch(e){ return null; }
+}
+async function listContracts(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,data,created_at&order=created_at.desc&limit=200`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if(!res.ok) return [];
+    return await res.json();
+  }catch(e){ return []; }
+}
+
+/* ================= BADGES / HELPERS UI ================= */
+function statusMeta(status){
+  if(status==='signed') return {cls:'signed', label:'Signé', icon:'check_circle'};
+  if(status==='draft') return {cls:'draft', label:'Brouillon', icon:'description'};
+  return {cls:'pending', label:'En attente', icon:'hourglass_empty'};
+}
+function badgeHTML(status){
+  const m = statusMeta(status);
+  return `<span class="badge ${m.cls}"><span class="dot"></span>${m.label}</span>`;
+}
+
+/* ================= VUE : TABLEAU DE BORD ================= */
+async function renderDashboard(){
+  content.innerHTML = `<div class="empty">Chargement du tableau de bord…</div>`;
+  const rows = await listContracts();
+
+  const now = new Date();
+  const enAttente = rows.filter(r => r.data.status === 'pending').length;
+  const brouillons = rows.filter(r => r.data.status === 'draft').length;
+  const signesCeMois = rows.filter(r => r.data.status === 'signed' && r.data.signedAt &&
+    new Date(r.data.signedAt).getMonth() === now.getMonth() &&
+    new Date(r.data.signedAt).getFullYear() === now.getFullYear()).length;
+
+  const recent = rows.slice(0, 5);
+
+  content.innerHTML = `
+    <div class="page-title">Tableau de bord</div>
+    <div class="page-sub">Vue d'ensemble de vos contrats de prestation.</div>
+
+    <button class="btn btn-primary btn-block" id="btn-new-top" style="margin-bottom:24px;">
+      <span class="material-symbols-outlined">add</span> Nouveau contrat
+    </button>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">En attente</span><span class="stat-icon pending"><span class="material-symbols-outlined">hourglass_empty</span></span></div>
+        <span class="stat-value">${enAttente}</span>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">Signés (ce mois)</span><span class="stat-icon signed"><span class="material-symbols-outlined">check_circle</span></span></div>
+        <span class="stat-value">${signesCeMois}</span>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">Brouillons</span><span class="stat-icon draft"><span class="material-symbols-outlined">description</span></span></div>
+        <span class="stat-value">${brouillons}</span>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Contrats récents</h2>
+      ${rows.length>5 ? `<button class="link-plain" id="btn-see-all">Voir tout</button>` : ''}
+    </div>
+    <div class="list-card">
+      ${recent.length ? recent.map(r => rowHTML(r)).join('') : `<div class="empty">Aucun contrat pour l'instant. Crée le premier avec "Nouveau contrat".</div>`}
+    </div>
+  `;
+
+  document.getElementById('btn-new-top').addEventListener('click', ()=> go({view:'new'}));
+  const seeAll = document.getElementById('btn-see-all');
+  if(seeAll) seeAll.addEventListener('click', ()=> go({view:'list'}));
+  bindRowClicks();
+}
+
+function rowHTML(r){
+  const d = r.data;
+  const m = statusMeta(d.status);
+  return `
+    <div class="list-row" data-id="${r.id}">
+      <div class="row-icon"><span class="material-symbols-outlined">description</span></div>
+      <div class="row-main">
+        <p class="row-title">Contrat de Prestation MC — ${escapeHtml(d.clientName)||'Sans nom'}</p>
+        <p class="row-sub">${escapeHtml(d.clientName)||'Non assigné'} · ${fmtDate(r.created_at)}</p>
+      </div>
+      ${badgeHTML(d.status)}
+    </div>`;
+}
+function bindRowClicks(){
+  document.querySelectorAll('.list-row').forEach(row=>{
+    row.addEventListener('click', ()=> go({id: row.dataset.id, admin:'1'}));
+  });
+}
+
+/* ================= VUE : LISTE COMPLÈTE ================= */
+async function renderList(){
+  content.innerHTML = `<div class="empty">Chargement…</div>`;
+  const rows = await listContracts();
+  content.innerHTML = `
+    <div class="page-title">Tous les contrats</div>
+    <div class="page-sub">${rows.length} contrat${rows.length>1?'s':''} au total.</div>
+    <div class="list-card">
+      ${rows.length ? rows.map(r=>rowHTML(r)).join('') : `<div class="empty">Aucun contrat pour l'instant.</div>`}
+    </div>
+  `;
+  bindRowClicks();
+}
+
+/* ================= VUE : NOUVEAU CONTRAT ================= */
+async function renderCreate(editId){
+  let existing = null;
+  if(editId){ existing = await loadContract(editId); }
+  const d = existing || {};
+
+  content.innerHTML = `
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:23px;">${editId ? 'Modifier le brouillon' : 'Nouveau Contrat de Prestation'}</h2>
+      <p style="color:var(--ink-soft);font-size:14px;margin:0 0 4px;">Saisis les informations du/de la client(e) pour préparer le document.</p>
+
+      <label>Nom complet du/de la client(e)</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">person</span>
+        <input type="text" id="f-name" placeholder="Ex : Aïcha KOFFI" value="${escapeHtml(d.clientName)||''}"></div>
+
+      <label>Montant total de la prestation (FCFA)</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">payments</span>
+        <input type="number" id="f-amount" placeholder="Ex : 250000" value="${d.totalAmount||''}"></div>
+      <div class="hint" id="acompte-hint">Acompte (50%) : ${d.totalAmount ? fcfa(d.totalAmount/2) : '—'}</div>
+
+      <label>Date de la prestation</label>
+      <div class="row2">
+        <input type="number" id="f-pday" placeholder="Jour" min="1" max="31" value="${d.prestationDay||''}">
+        <input type="number" id="f-pmonth" placeholder="Mois" min="1" max="12" value="${d.prestationMonth||''}">
+      </div>
+      <div class="hint">Année fixée à 2026, comme sur le modèle.</div>
+
+      <label>Lieu de signature ("Fait à ...")</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
+        <input type="text" id="f-lieu" placeholder="Ex : Abidjan" value="${escapeHtml(d.lieu)||''}"></div>
+
+      <label>Date de signature du contrat</label>
+      <div class="row2">
+        <input type="number" id="f-sday" placeholder="Jour" min="1" max="31" value="${d.signDay||''}">
+        <input type="number" id="f-smonth" placeholder="Mois" min="1" max="12" value="${d.signMonth||''}">
+      </div>
+
+      <div class="divider"></div>
+
+      <label style="margin-top:0;">Signature du Prestataire (optionnel à cette étape)</label>
+      <div class="sig-tabs">
+        <div class="sig-tab active" data-tab="draw-presta">Dessiner</div>
+        <div class="sig-tab" data-tab="type-presta">Taper mon nom</div>
+      </div>
+      <div class="sig-pane active" id="draw-presta"><canvas class="pad" id="presta-pad"></canvas>
+        <div class="sig-actions"><button class="btn btn-ghost btn-sm" id="clear-presta">Effacer</button></div>
+      </div>
+      <div class="sig-pane" id="type-presta"><input type="text" class="typed-sig-input" id="presta-typed" placeholder="Votre nom"></div>
+
+      <div class="trust">
+        <div class="ic"><span class="material-symbols-outlined" style="font-size:17px;">lock</span></div>
+        <div><b>Sécurité garantie</b><br><span>Le lien généré sera unique pour le/la signataire.</span></div>
+      </div>
+
+      <div class="stack">
+        <button class="btn btn-primary btn-block" id="btn-generate">
+          <span class="material-symbols-outlined">send</span> Générer et envoyer le lien
+        </button>
+        <button class="btn btn-ghost btn-block" id="btn-draft">
+          <span class="material-symbols-outlined">description</span> Enregistrer comme brouillon
+        </button>
+      </div>
+      <div id="result-zone"></div>
+    </div>
+  `;
+
+  const amountInput = document.getElementById('f-amount');
+  amountInput.addEventListener('input', ()=>{
+    document.getElementById('acompte-hint').textContent = 'Acompte (50%) : ' + fcfa((Number(amountInput.value)||0)/2);
+  });
+
+  document.querySelectorAll('.sig-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.sig-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.sig-pane').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  const prestaPad = setupSignaturePad(document.getElementById('presta-pad'));
+  document.getElementById('clear-presta').addEventListener('click', ()=>prestaPad.clear());
+
+  function collect(){
+    const clientName = document.getElementById('f-name').value.trim();
+    const totalAmount = Number(document.getElementById('f-amount').value);
+    const prestationDay = document.getElementById('f-pday').value;
+    const prestationMonth = document.getElementById('f-pmonth').value;
+    const lieu = document.getElementById('f-lieu').value.trim();
+    const signDay = document.getElementById('f-sday').value;
+    const signMonth = document.getElementById('f-smonth').value;
+
+    let prestaSig = existing ? existing.prestaSig : null;
+    const drawActive = document.getElementById('draw-presta').classList.contains('active');
+    if(drawActive){
+      if(!prestaPad.isEmpty()) prestaSig = {type:'draw', data: prestaPad.dataURL()};
+    } else {
+      const typed = document.getElementById('presta-typed').value.trim();
+      if(typed) prestaSig = {type:'typed', data: typed};
+    }
+    return {clientName, totalAmount, prestationDay, prestationMonth, lieu, signDay, signMonth, prestaSig};
+  }
+
+  document.getElementById('btn-draft').addEventListener('click', async ()=>{
+    const f = collect();
+    if(!f.clientName){ alert('Merci de renseigner au moins le nom du client.'); return; }
+    const id = editId || genId();
+    const data = { ...f, status:'draft', clientSig: existing?existing.clientSig:null, createdAt: existing?existing.createdAt:Date.now() };
+    const btn = document.getElementById('btn-draft');
+    btn.disabled = true; btn.textContent = 'Enregistrement...';
+    const ok = await saveContract(id, data);
+    btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">description</span> Enregistrer comme brouillon';
+    if(!ok){ alert("Erreur lors de l'enregistrement, réessaie."); return; }
+    go({});
+  });
+
+  document.getElementById('btn-generate').addEventListener('click', async ()=>{
+    const f = collect();
+    if(!f.clientName || !f.totalAmount){ alert('Merci de renseigner au moins le nom du client et le montant.'); return; }
+
+    const id = editId || genId();
+    const data = { ...f, status:'pending', clientSig: existing?existing.clientSig:null, createdAt: existing?existing.createdAt:Date.now() };
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true; btn.textContent = 'Génération...';
+    const ok = await saveContract(id, data);
+    btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">send</span> Générer et envoyer le lien';
+    if(!ok){ alert('Erreur lors de la création du contrat, réessaie.'); return; }
+
+    const link = shareLink(id);
+    const waText = encodeURIComponent(`Bonjour ${f.clientName}, voici votre contrat de prestation Mon MC de Rêve à consulter et signer : ${link}`);
+    document.getElementById('result-zone').innerHTML = `
+      <div class="banner ok" style="margin-top:18px;"><span class="material-symbols-outlined" style="font-size:17px;">check_circle</span> Contrat créé ! Envoie ce lien au/à la client(e) pour signature.</div>
+      <div class="linkbox"><span id="link-text">${link}</span><button class="copybtn" id="copy-link">Copier</button></div>
+      <div class="stack">
+        <a class="btn wa btn-block" href="https://wa.me/?text=${waText}" target="_blank">Envoyer via WhatsApp</a>
+        <button class="btn btn-ghost btn-block" id="btn-dashboard">Retour au tableau de bord</button>
+      </div>
+    `;
+    document.getElementById('copy-link').addEventListener('click', ()=>{
+      navigator.clipboard.writeText(link);
+      document.getElementById('copy-link').textContent = 'Copié !';
+    });
+    document.getElementById('btn-dashboard').addEventListener('click', ()=> go({}));
+  });
+}
+
+/* ================= RENDU DU CONTRAT (2 pages) — INCHANGÉ ================= */
+function contractHTML(d, sig){
+  const prestaSig = renderSigBox(sig.presta);
+  const clientSig = renderSigBox(sig.client);
+  return `
+  <div class="page" id="pdf-page-1">
+    <div class="p-header"><div class="mono">✒</div><h1>CREATIVE PLANNER</h1></div>
+    <div class="p-title"><h2>CONTRAT DE PRESTATION</h2><div class="subtitle">MAITRE DE CEREMONIE</div></div>
+    <div class="p-body">
+      <p>Entre les soussignés</p>
+      <div class="parties">
+        <div class="col"><b>${PRESTATAIRE_NOM},</b> ci après désigné « Prestataire » d'une part</div>
+        <div class="col"><b>${escapeHtml(d.clientName)||'____________________'},</b> ci après désigné « CLIENT(E) » d'autre part</div>
+      </div>
+      <div class="divider"></div>
+      <h3 class="art">Article 1 : Objet du contrat</h3>
+      <p>Le présent contrat a pour objet de définir les termes et conditions dans lesquels le Prestataire s'engage à fournir au / à la Client(e) une prestation de services en qualité de Maître de cérémonie. La prestation se déroulera le
+        <span class="fillblank">${pad2(d.prestationDay)}</span> / <span class="fillblank">${pad2(d.prestationMonth)}</span> / 2026, selon les modalités convenues entre les parties.</p>
+      <h3 class="art">Article 2 : Obligation des Parties</h3>
+      <p>1. Obligations du Prestataire</p>
+      <p>Le Prestataire s'engage à assurer la prestation de Maître de cérémonie avec professionnalisme, diligence et conformément aux règles de l'art. À ce titre, il devra notamment :</p>
+      <ul>
+        <li>Préparer et animer l'événement selon le programme validé et le timing établi avec le/la Client(e) ;</li>
+        <li>Assurer la coordination des différentes interventions (discours, animations, etc.);</li>
+        <li>Se présenter sur le lieu de la prestation à l'heure convenue.</li>
+      </ul>
+      <p>2. Obligations du/de la Client(e)</p>
+      <p>Le/La Client(e) s'engage à :</p>
+      <ul>
+        <li>Fournir au Prestataire, en temps utile, toutes les informations nécessaires à la bonne exécution de la prestation (programme, intervenants, consignes particulières, etc.) ;</li>
+        <li>Mettre à disposition les moyens techniques nécessaires à la bonne réalisation de la prestation (sonorisation, micro, accès au site, etc.), sauf stipulation contraire ;</li>
+        <li>Respecter les échéances de paiement convenues au présent contrat ;</li>
+        <li>Informer le Prestataire de toute modification susceptible d'impacter le bon déroulement de la prestation dans les meilleurs délais.</li>
+      </ul>
+    </div>
+    <div class="p-footer"><div class="flogo"><div class="fdot">CP</div><span>CREATIVE PLANNER</span></div><div>${CONTACT_TEL}</div><div>${CONTACT_MAIL}</div></div>
+  </div>
+  <div class="page" id="pdf-page-2">
+    <div class="p-body" style="padding-top:40px;">
+      <h3 class="art" style="margin-top:0;">Article 3 : Rémunération</h3>
+      <p>La Cliente s'engage à verser au Prestataire un montant total de <span class="fillblank">${fcfa(d.totalAmount)}</span> en contrepartie des services fournis au titre du présent contrat. Un acompte équivalent à cinquante pour cent (50 %) du montant total, soit la somme de <span class="fillblank">${fcfa(d.totalAmount/2)}</span>, devra être versé à la signature du présent contrat afin de valider la réservation de la date de la prestation.</p>
+      <p>Le solde restant, soit cinquante pour cent (50 %) du montant total, devra être réglé selon les modalités convenues entre les parties, et au plus tard avant la réalisation de la prestation, sauf stipulation contraire.</p>
+      <h3 class="art">Article 4: Conditions d'annulation</h3>
+      <p>En cas d'annulation ou de modification de la prestation à l'initiative du Prestataire, celui-ci s'engage à procéder au remboursement intégral de l'acompte versé par le Client, dans un délai raisonnable.</p>
+      <p>En revanche, en cas d'annulation de la prestation à l'initiative du Client, l'acompte versé demeure acquis au Prestataire à titre de dédommagement, et ne pourra faire l'objet d'aucun remboursement.</p>
+      <h3 class="art">Article 5 : Entrée en vigueur</h3>
+      <p>Le présent contrat entre en vigueur à compter de sa signature par les deux parties et produit ses effets à cette même date.</p>
+      <h3 class="art">Article 6 : Litiges</h3>
+      <p>En cas de litige relatif à l'interprétation ou à l'exécution du présent contrat, les parties s'efforceront de le résoudre à l'amiable. À défaut d'accord, le litige sera soumis à la juridiction compétente.</p>
+      <div class="divider" style="margin-top:26px;"></div>
+      <div class="faitle">Fait à <span class="fillblank">${escapeHtml(d.lieu)||'____________'}</span> le <span class="fillblank">${pad2(d.signDay)}</span>/<span class="fillblank">${pad2(d.signMonth)}</span>/2026</div>
+      <div class="sign-block">
+        <div class="sign-col"><div class="label">Prestataire :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${prestaSig}</div>
+        <div class="sign-col"><div class="label">Client :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${clientSig}</div>
+      </div>
+    </div>
+    <div class="p-footer"><div class="flogo"><div class="fdot">CP</div><span>CREATIVE PLANNER</span></div><div>${CONTACT_TEL}</div><div>${CONTACT_MAIL}</div></div>
+  </div>`;
+}
+function renderSigBox(sig){
+  if(!sig) return '<div style="height:70px;"></div>';
+  if(sig.type==='draw') return `<img class="sign-img" src="${sig.data}">`;
+  if(sig.type==='typed') return `<div class="sign-typed">${escapeHtml(sig.data)}</div>`;
+  return '<div style="height:70px;"></div>';
+}
+
+/* ================= SCALING RESPONSIVE DES PAGES ================= */
+function fitPages(container){
+  const scaler = container.querySelector('.page-scaler');
+  if(!scaler) return;
+  const w = container.clientWidth;
+  const scale = Math.min(1, w/794);
+  scaler.style.transform = `scale(${scale})`;
+  const pages = scaler.querySelectorAll('.page');
+  let totalH = 0;
+  pages.forEach(p=> totalH += p.offsetHeight);
+  totalH += (pages.length-1)*18;
+  container.style.height = (totalH*scale)+'px';
+}
+
+/* ================= GENERATION PDF ================= */
+async function generatePDF(filename){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','pt','a4');
+  const pageIds = ['pdf-page-1','pdf-page-2'];
+  for(let i=0;i<pageIds.length;i++){
+    const el = document.getElementById(pageIds[i]);
+    const canvas = await html2canvas(el, {scale:2, backgroundColor:'#ffffff'});
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const ratio = canvas.height/canvas.width;
+    let imgW = pageW, imgH = pageW*ratio;
+    if(imgH > pageH){ imgH = pageH; imgW = pageH/ratio; }
+    if(i>0) pdf.addPage();
+    pdf.addImage(imgData,'JPEG',0,0,imgW,imgH);
+  }
+  pdf.save(filename);
+}
+
+/* ================= SIGNATURE PAD ================= */
+function setupSignaturePad(canvas){
+  const ctx = canvas.getContext('2d');
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2; canvas.height = rect.height * 2;
+    ctx.scale(2,2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#1a1a1a';
+  }
+  resize();
+  let drawing=false, hasDrawn=false;
+  function pos(e){ const rect = canvas.getBoundingClientRect(); const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left; const cy=(e.touches?e.touches[0].clientY:e.clientY)-rect.top; return {x:cx,y:cy}; }
+  function start(e){ drawing=true; hasDrawn=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault();}
+  function move(e){ if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault();}
+  function end(){ drawing=false; }
+  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',end);
+  return {
+    clear(){ ctx.clearRect(0,0,canvas.width,canvas.height); hasDrawn=false; },
+    isEmpty(){ return !hasDrawn; },
+    dataURL(){ return canvas.toDataURL('image/png'); }
+  };
+}
+function renderHiddenPagesForPDF(data, sig){
+  let host = document.getElementById('pdf-render-host');
+  if(!host){ host = document.createElement('div'); host.id='pdf-render-host'; host.style.position='fixed'; host.style.left='-9999px'; host.style.top='0'; document.body.appendChild(host); }
+  host.innerHTML = contractHTML(data, sig);
+}
+
+/* ================= VUE : DÉTAIL / SIGNATURE D'UN CONTRAT ================= */
+async function renderContractView(id, isAdmin){
+  content.innerHTML = `<div class="empty">Chargement du contrat…</div>`;
+  const data = await loadContract(id);
+  if(!data){
+    content.innerHTML = `<div class="card"><div class="banner err"><span class="material-symbols-outlined" style="font-size:17px;">error</span> Ce lien de contrat est introuvable ou a expiré. Contacte Mon MC de Rêve pour recevoir un nouveau lien.</div></div>`;
+    return;
+  }
+  const m = statusMeta(data.status);
+
+  if(isAdmin){
+    const link = shareLink(id);
+    content.innerHTML = `
+      <div class="ref-row">
+        <span class="ref-code">Réf : ${refCode(id)}</span>
+        ${badgeHTML(data.status)}
+        <span style="font-size:12.5px;color:var(--ink-soft);">Client : ${escapeHtml(data.clientName)||'—'}</span>
+      </div>
+      <div class="doc-frame">
+        <div class="pages-wrap" id="pages-wrap"><div class="page-scaler" id="page-scaler"></div></div>
+      </div>
+      <div class="card">
+        ${data.status === 'draft' ? `
+          <button class="btn btn-primary btn-block" id="btn-continue">
+            <span class="material-symbols-outlined">edit</span> Continuer l'édition du brouillon
+          </button>` : `
+          <div class="linkbox"><span>${link}</span><button class="copybtn" id="copy-link">Copier</button></div>
+          ${data.status === 'signed' ? `
+            <button class="btn btn-success btn-block" id="btn-download">
+              <span class="material-symbols-outlined">download</span> Télécharger le PDF signé
+            </button>` : `
+            <div class="banner warn"><span class="material-symbols-outlined" style="font-size:17px;">hourglass_empty</span> En attente de signature du/de la client(e).</div>
+          `}
+        `}
+      </div>
+    `;
+    const scaler = document.getElementById('page-scaler');
+    scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig});
+    fitPages(document.getElementById('pages-wrap'));
+    window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
+
+    const contBtn = document.getElementById('btn-continue');
+    if(contBtn) contBtn.addEventListener('click', ()=> go({view:'new', edit:id}));
+    const copyBtn = document.getElementById('copy-link');
+    if(copyBtn) copyBtn.addEventListener('click', ()=>{ navigator.clipboard.writeText(link); copyBtn.textContent='Copié !'; });
+    const dlBtn = document.getElementById('btn-download');
+    if(dlBtn) dlBtn.addEventListener('click', async ()=>{
+      dlBtn.disabled=true; dlBtn.innerHTML='Préparation...';
+      renderHiddenPagesForPDF(data, {presta:data.prestaSig, client:data.clientSig});
+      await generatePDF(`Contrat_${(data.clientName||'client').replace(/\s+/g,'_')}_signe.pdf`);
+      dlBtn.disabled=false; dlBtn.innerHTML='<span class="material-symbols-outlined">download</span> Télécharger le PDF signé';
+    });
+    return;
+  }
+
+  /* ---- Vue client ---- */
+  const alreadySigned = data.status === 'signed';
+
+  if(alreadySigned){
+    content.innerHTML = `
+      <div class="success-hero">
+        <div class="success-check"><span class="material-symbols-outlined">check_circle</span></div>
+        <h2>Contrat signé</h2>
+        <p>Merci ${escapeHtml(data.clientName)||''}, ton contrat a bien été signé. Tu peux le retélécharger ci-dessous à tout moment.</p>
+      </div>
+      <div class="doc-frame">
+        <div class="pages-wrap" id="pages-wrap"><div class="page-scaler" id="page-scaler"></div></div>
+      </div>
+      <div class="card">
+        <div class="ref-row" style="margin-bottom:14px;">
+          <span class="ref-code">Réf : ${refCode(id)}</span>${badgeHTML(data.status)}
+        </div>
+        <button class="btn btn-success btn-block" id="btn-redownload">
+          <span class="material-symbols-outlined">download</span> Télécharger le contrat signé (PDF)
+        </button>
+      </div>
+    `;
+    const scaler = document.getElementById('page-scaler');
+    scaler.innerHTML = contractHTML(data, {presta:data.prestaSig, client:data.clientSig});
+    fitPages(document.getElementById('pages-wrap'));
+    window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
+    document.getElementById('btn-redownload').addEventListener('click', async (e)=>{
+      e.target.disabled=true; e.target.innerHTML='Préparation...';
+      renderHiddenPagesForPDF(data, {presta:data.prestaSig, client:data.clientSig});
+      await generatePDF(`Contrat_${(data.clientName||'client').replace(/\s+/g,'_')}_signe.pdf`);
+      e.target.disabled=false; e.target.innerHTML='<span class="material-symbols-outlined">download</span> Télécharger le contrat signé (PDF)';
+    });
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="ref-row">
+      <span class="ref-code">Réf : ${refCode(id)}</span>${badgeHTML(data.status)}
+      <span style="font-size:12.5px;color:var(--ink-soft);">Émis le ${fmtDate(data.createdAt)}</span>
+    </div>
+    <div class="doc-frame">
+      <div class="pages-wrap" id="pages-wrap"><div class="page-scaler" id="page-scaler"></div></div>
+    </div>
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:19px;">Votre signature</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 4px;">En signant, tu certifies avoir lu et approuvé ce contrat.</p>
+      <div class="sig-tabs">
+        <div class="sig-tab active" data-tab="draw-client">Dessiner ma signature</div>
+        <div class="sig-tab" data-tab="type-client">Taper mon nom</div>
+      </div>
+      <div class="sig-pane active" id="draw-client"><canvas class="pad" id="client-pad"></canvas>
+        <div class="sig-actions"><button class="btn btn-ghost btn-sm" id="clear-client">Effacer</button></div>
+      </div>
+      <div class="sig-pane" id="type-client"><input type="text" class="typed-sig-input" id="client-typed" placeholder="Votre nom"></div>
+      <div class="stack">
+        <button class="btn btn-success btn-block" id="btn-sign">
+          <span class="material-symbols-outlined">draw</span> Confirmer la signature
+        </button>
+      </div>
+    </div>
+  `;
+
+  const scaler = document.getElementById('page-scaler');
+  scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig});
+  fitPages(document.getElementById('pages-wrap'));
+  window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
+
+  document.querySelectorAll('.sig-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.sig-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.sig-pane').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+  const clientPad = setupSignaturePad(document.getElementById('client-pad'));
+  document.getElementById('clear-client').addEventListener('click', ()=>clientPad.clear());
+
+  document.getElementById('btn-sign').addEventListener('click', async ()=>{
+    const drawActive = document.getElementById('draw-client').classList.contains('active');
+    let clientSig = null;
+    if(drawActive){
+      if(clientPad.isEmpty()){ alert('Merci de dessiner ta signature avant de valider.'); return; }
+      clientSig = {type:'draw', data: clientPad.dataURL()};
+    } else {
+      const typed = document.getElementById('client-typed').value.trim();
+      if(!typed){ alert('Merci de taper ton nom en guise de signature.'); return; }
+      clientSig = {type:'typed', data: typed};
+    }
+    const btn = document.getElementById('btn-sign');
+    btn.disabled = true; btn.innerHTML = 'Signature en cours...';
+
+    data.clientSig = clientSig;
+    data.status = 'signed';
+    data.signedAt = Date.now();
+    await saveContract(id, data);
+
+    renderHiddenPagesForPDF(data, {presta:data.prestaSig, client:data.clientSig});
+    await generatePDF(`Contrat_${(data.clientName||'client').replace(/\s+/g,'_')}_signe.pdf`);
+
+    renderContractView(id, false);
+  });
+}
+
+/* ================= BOOT ================= */
+const content = document.getElementById('content');
+route();
+</script>
+</body>
+</html>
