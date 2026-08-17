@@ -116,7 +116,7 @@
   label:first-of-type{margin-top:0;}
   .field-wrap{position:relative;}
   .field-wrap .material-symbols-outlined{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:19px;}
-  input[type=text],input[type=number],input[type=date]{
+  input[type=text],input[type=number],input[type=date],input[type=time]{
     width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--border);border-radius:10px;
     font-size:15px;background:var(--surface-alt);color:var(--ink);font-family:inherit;
   }
@@ -252,7 +252,19 @@ const AUTH_KEY = "mc_de_reve_auth";
 function isAuthed(){ return localStorage.getItem(AUTH_KEY) === 'ok'; }
 function setAuthed(v){ if(v) localStorage.setItem(AUTH_KEY,'ok'); else localStorage.removeItem(AUTH_KEY); }
 async function loadAccount(){ return await loadContract(ACCOUNT_ID); }
-async function saveAccount(username, password){ return await saveContract(ACCOUNT_ID, {username, password}); }
+async function hashPassword(pw){
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function looksHashed(pw){ return typeof pw === 'string' && /^[0-9a-f]{64}$/i.test(pw); }
+async function saveAccountHashed(username, hashedPassword){
+  return await saveContract(ACCOUNT_ID, {username, password: hashedPassword});
+}
+async function saveAccount(username, plainPassword){
+  const hashed = await hashPassword(plainPassword);
+  return await saveAccountHashed(username, hashed);
+}
 
 /* ================= UTILITAIRES ================= */
 function genId(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
@@ -309,6 +321,9 @@ function route(){
   } else if(view === 'list'){
     backBtn.style.display = 'flex';
     renderList();
+  } else if(view === 'events'){
+    backBtn.style.display = 'flex';
+    renderEvents();
   } else if(view === 'account'){
     backBtn.style.display = 'flex';
     renderAccountSettings();
@@ -388,10 +403,10 @@ async function renderAccountSettings(){
     if(p || p2){
       if(p !== p2){ errBox.textContent = "Les deux mots de passe ne correspondent pas."; errBox.style.display='flex'; return; }
     }
-    const finalPassword = p ? p : (account ? account.password : '');
     const btn = document.getElementById('btn-save-account');
     btn.disabled = true; btn.textContent = 'Enregistrement...';
-    const ok = await saveAccount(u, finalPassword);
+    // Si un nouveau mot de passe est saisi on le (re)chiffre, sinon on conserve le hash existant tel quel.
+    const ok = p ? await saveAccount(u, p) : await saveAccountHashed(u, account ? account.password : '');
     btn.disabled = false; btn.textContent = 'Enregistrer les modifications';
     if(!ok){ errBox.textContent = "Erreur lors de l'enregistrement, réessaie."; errBox.style.display='flex'; return; }
     document.getElementById('acc-pass').value = '';
@@ -467,10 +482,19 @@ function renderLogin(account){
       </div>
     </div>
   `;
-  function tryLogin(){
+  async function tryLogin(){
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
-    if(u === account.username && p === account.password){
+    let valid = false;
+    if(looksHashed(account.password)){
+      const hashedInput = await hashPassword(p);
+      valid = (u === account.username && hashedInput === account.password);
+    } else {
+      // Ancien compte enregistré avant le chiffrement : on migre discrètement.
+      valid = (u === account.username && p === account.password);
+      if(valid) await saveAccount(u, p);
+    }
+    if(valid){
       setAuthed(true);
       route();
     } else {
@@ -547,8 +571,11 @@ async function renderDashboard(){
     <div class="page-title">Tableau de bord</div>
     <div class="page-sub">Vue d'ensemble de vos contrats de prestation.</div>
 
-    <button class="btn btn-primary btn-block" id="btn-new-top" style="margin-bottom:24px;">
+    <button class="btn btn-primary btn-block" id="btn-new-top" style="margin-bottom:12px;">
       <span class="material-symbols-outlined">add</span> Nouveau contrat
+    </button>
+    <button class="btn btn-ghost btn-block" id="btn-events-top" style="margin-bottom:24px;">
+      <span class="material-symbols-outlined">event</span> Voir les événements à venir
     </button>
 
     <div class="stats-grid">
@@ -576,14 +603,10 @@ async function renderDashboard(){
   `;
 
   document.getElementById('btn-new-top').addEventListener('click', ()=> go({view:'new'}));
+  document.getElementById('btn-events-top').addEventListener('click', ()=> go({view:'events'}));
   const seeAll = document.getElementById('btn-see-all');
   if(seeAll) seeAll.addEventListener('click', ()=> go({view:'list'}));
   bindRowClicks();
-
-  if(rows.some(r => r.data.status === 'pending')){
-    clearPolling();
-    pollTimer = setInterval(renderDashboard, 8000);
-  }
 }
 
 function rowHTML(r){
@@ -615,6 +638,56 @@ async function renderList(){
     <div class="list-card">
       ${rows.length ? rows.map(r=>rowHTML(r)).join('') : `<div class="empty">Aucun contrat pour l'instant.</div>`}
     </div>
+  `;
+  bindRowClicks();
+}
+
+/* ================= VUE : ÉVÉNEMENTS (agenda trié par date de prestation) ================= */
+async function renderEvents(){
+  content.innerHTML = `<div class="empty">Chargement…</div>`;
+  const rows = await listContracts();
+
+  const todayISO = new Date().toISOString().slice(0,10);
+  const withDate = rows.filter(r => r.data.prestationDate);
+  const withoutDate = rows.filter(r => !r.data.prestationDate);
+  withDate.sort((a,b)=> a.data.prestationDate.localeCompare(b.data.prestationDate));
+  const upcoming = withDate.filter(r => r.data.prestationDate >= todayISO);
+  const past = withDate.filter(r => r.data.prestationDate < todayISO).reverse();
+
+  function eventRow(r){
+    const d = r.data;
+    const m = statusMeta(d.status);
+    const dateLong = formatDateLong(d.prestationDate);
+    const hasEvent = d.eventLocation || d.eventTime;
+    return `
+      <div class="list-row" data-id="${r.id}">
+        <div class="row-icon"><span class="material-symbols-outlined">celebration</span></div>
+        <div class="row-main">
+          <p class="row-title">${dateLong || 'Date à préciser'} — ${escapeHtml(d.clientName)||'Sans nom'}</p>
+          <p class="row-sub">${hasEvent ? `${escapeHtml(d.eventLocation)||''}${d.eventLocation && d.eventTime ? ' · ' : ''}${escapeHtml(d.eventTime)||''}` : (d.status==='signed' ? 'Lieu/heure à renseigner' : 'Détails ajoutés après signature')}</p>
+        </div>
+        ${badgeHTML(d.status)}
+      </div>`;
+  }
+
+  content.innerHTML = `
+    <div class="page-title">Événements</div>
+    <div class="page-sub">Prestations classées par date, du plus proche au plus lointain.</div>
+
+    <div class="section-head"><h2>À venir</h2></div>
+    <div class="list-card" style="margin-bottom:22px;">
+      ${upcoming.length ? upcoming.map(eventRow).join('') : `<div class="empty">Aucun événement à venir pour l'instant.</div>`}
+    </div>
+
+    ${past.length ? `
+      <div class="section-head"><h2>Passés</h2></div>
+      <div class="list-card" style="margin-bottom:22px;">${past.map(eventRow).join('')}</div>
+    ` : ''}
+
+    ${withoutDate.length ? `
+      <div class="section-head"><h2>Sans date renseignée</h2></div>
+      <div class="list-card">${withoutDate.map(r=>rowHTML(r)).join('')}</div>
+    ` : ''}
   `;
   bindRowClicks();
 }
@@ -924,6 +997,21 @@ async function renderContractView(id, isAdmin){
           `}
         `}
       </div>
+      ${data.status === 'signed' ? `
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:17px;">Détails de l'événement</h2>
+        <p style="color:var(--ink-soft);font-size:13px;margin:0 0 4px;">À renseigner une fois le contrat signé — utile pour ton agenda.</p>
+        <label>Lieu de l'événement</label>
+        <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
+          <input type="text" id="ev-location" placeholder="Ex : Salle des fêtes, Cocody" value="${escapeHtml(data.eventLocation)||''}"></div>
+        <label>Heure de l'événement</label>
+        <div class="field-wrap"><span class="material-symbols-outlined">schedule</span>
+          <input type="time" id="ev-time" value="${data.eventTime||''}"></div>
+        <div id="ev-ok" class="banner ok" style="display:none;margin-top:14px;">Détails enregistrés.</div>
+        <div class="stack">
+          <button class="btn btn-ghost btn-block" id="btn-save-event">Enregistrer le lieu et l'heure</button>
+        </div>
+      </div>` : ''}
     `;
     const scaler = document.getElementById('page-scaler');
     scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig}, 'view');
@@ -942,6 +1030,19 @@ async function renderContractView(id, isAdmin){
       renderHiddenPagesForPDF(data, {presta:data.prestaSig, client:data.clientSig});
       await generatePDF(`Contrat_${(data.clientName||'client').replace(/\s+/g,'_')}_signe.pdf`);
       dlBtn.disabled=false; dlBtn.innerHTML='<span class="material-symbols-outlined">download</span> Télécharger le PDF signé';
+    });
+    const saveEvBtn = document.getElementById('btn-save-event');
+    if(saveEvBtn) saveEvBtn.addEventListener('click', async ()=>{
+      data.eventLocation = document.getElementById('ev-location').value.trim();
+      data.eventTime = document.getElementById('ev-time').value;
+      saveEvBtn.disabled = true; saveEvBtn.textContent = 'Enregistrement...';
+      const ok = await saveContract(id, data);
+      saveEvBtn.disabled = false; saveEvBtn.textContent = "Enregistrer le lieu et l'heure";
+      if(ok){
+        const okBox = document.getElementById('ev-ok');
+        okBox.style.display = 'flex';
+        setTimeout(()=>{ okBox.style.display = 'none'; }, 2500);
+      }
     });
     return;
   }
