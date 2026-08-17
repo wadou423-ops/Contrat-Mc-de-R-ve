@@ -647,49 +647,85 @@ async function renderEvents(){
   content.innerHTML = `<div class="empty">Chargement…</div>`;
   const rows = await listContracts();
 
+  // Uniquement les contrats signés : un événement n'existe que si le contrat est confirmé.
+  const signed = rows.filter(r => r.data.status === 'signed');
+
   const todayISO = new Date().toISOString().slice(0,10);
-  const withDate = rows.filter(r => r.data.prestationDate);
-  const withoutDate = rows.filter(r => !r.data.prestationDate);
+  const withDate = signed.filter(r => r.data.prestationDate);
+  const withoutDate = signed.filter(r => !r.data.prestationDate);
   withDate.sort((a,b)=> a.data.prestationDate.localeCompare(b.data.prestationDate));
   const upcoming = withDate.filter(r => r.data.prestationDate >= todayISO);
   const past = withDate.filter(r => r.data.prestationDate < todayISO).reverse();
 
-  function eventRow(r){
+  function eventCard(r){
     const d = r.data;
-    const m = statusMeta(d.status);
-    const dateLong = formatDateLong(d.prestationDate);
-    const hasEvent = d.eventLocation || d.eventTime;
+    const dateLong = formatDateLong(d.prestationDate) || 'Date non renseignée';
     return `
-      <div class="list-row" data-id="${r.id}">
-        <div class="row-icon"><span class="material-symbols-outlined">celebration</span></div>
-        <div class="row-main">
-          <p class="row-title">${dateLong || 'Date à préciser'} — ${escapeHtml(d.clientName)||'Sans nom'}</p>
-          <p class="row-sub">${hasEvent ? `${escapeHtml(d.eventLocation)||''}${d.eventLocation && d.eventTime ? ' · ' : ''}${escapeHtml(d.eventTime)||''}` : (d.status==='signed' ? 'Lieu/heure à renseigner' : 'Détails ajoutés après signature')}</p>
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <p class="row-title" style="margin:0 0 2px;">${dateLong} — ${escapeHtml(d.clientName)||'Sans nom'}</p>
+            <p class="row-sub" style="margin:0;">${fcfa(d.totalAmount)}</p>
+          </div>
+          <button class="btn btn-ghost btn-sm view-contract-btn" data-id="${r.id}" style="width:auto;padding:7px 12px;font-size:12px;white-space:nowrap;">Voir le contrat</button>
         </div>
-        ${badgeHTML(d.status)}
+        <div class="row2" style="margin-top:14px;">
+          <div>
+            <label style="margin-top:0;">Lieu de l'événement</label>
+            <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
+              <input type="text" class="ev-loc" data-id="${r.id}" placeholder="Ex : Salle des fêtes, Cocody" value="${escapeHtml(d.eventLocation)||''}"></div>
+          </div>
+          <div>
+            <label style="margin-top:0;">Heure</label>
+            <div class="field-wrap"><span class="material-symbols-outlined">schedule</span>
+              <input type="time" class="ev-time" data-id="${r.id}" value="${d.eventTime||''}"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+          <button class="btn btn-primary save-ev-btn" data-id="${r.id}" style="width:auto;padding:9px 16px;font-size:13px;">Enregistrer</button>
+          <span class="ev-saved" data-id="${r.id}" style="display:none;color:#217a41;font-size:13px;font-weight:600;">✓ Enregistré</span>
+        </div>
       </div>`;
   }
 
   content.innerHTML = `
     <div class="page-title">Événements</div>
-    <div class="page-sub">Prestations classées par date, du plus proche au plus lointain.</div>
+    <div class="page-sub">Uniquement les contrats signés, classés par date de prestation. Ajoute ici le lieu et l'heure exacts de chaque événement.</div>
 
     <div class="section-head"><h2>À venir</h2></div>
-    <div class="list-card" style="margin-bottom:22px;">
-      ${upcoming.length ? upcoming.map(eventRow).join('') : `<div class="empty">Aucun événement à venir pour l'instant.</div>`}
-    </div>
+    ${upcoming.length ? upcoming.map(eventCard).join('') : `<div class="list-card" style="margin-bottom:22px;"><div class="empty">Aucun événement signé à venir pour l'instant.</div></div>`}
 
     ${past.length ? `
       <div class="section-head"><h2>Passés</h2></div>
-      <div class="list-card" style="margin-bottom:22px;">${past.map(eventRow).join('')}</div>
+      ${past.map(eventCard).join('')}
     ` : ''}
 
     ${withoutDate.length ? `
-      <div class="section-head"><h2>Sans date renseignée</h2></div>
-      <div class="list-card">${withoutDate.map(r=>rowHTML(r)).join('')}</div>
+      <div class="section-head"><h2>Signés, sans date de prestation renseignée</h2></div>
+      ${withoutDate.map(eventCard).join('')}
     ` : ''}
   `;
-  bindRowClicks();
+
+  document.querySelectorAll('.view-contract-btn').forEach(b=>{
+    b.addEventListener('click', ()=> go({id: b.dataset.id, admin:'1'}));
+  });
+  document.querySelectorAll('.save-ev-btn').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      const id = b.dataset.id;
+      const row = rows.find(r => r.id === id);
+      if(!row) return;
+      row.data.eventLocation = document.querySelector(`.ev-loc[data-id="${id}"]`).value.trim();
+      row.data.eventTime = document.querySelector(`.ev-time[data-id="${id}"]`).value;
+      b.disabled = true; b.textContent = 'Enregistrement...';
+      const ok = await saveContract(id, row.data);
+      b.disabled = false; b.textContent = 'Enregistrer';
+      if(ok){
+        const saved = document.querySelector(`.ev-saved[data-id="${id}"]`);
+        saved.style.display = 'inline';
+        setTimeout(()=>{ saved.style.display = 'none'; }, 2000);
+      }
+    });
+  });
 }
 
 /* ================= VUE : NOUVEAU CONTRAT ================= */
@@ -1006,21 +1042,6 @@ async function renderContractView(id, isAdmin){
           `}
         `}
       </div>
-      ${data.status === 'signed' ? `
-      <div class="card">
-        <h2 style="margin:0 0 4px;font-size:17px;">Détails de l'événement</h2>
-        <p style="color:var(--ink-soft);font-size:13px;margin:0 0 4px;">À renseigner une fois le contrat signé — utile pour ton agenda.</p>
-        <label>Lieu de l'événement</label>
-        <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
-          <input type="text" id="ev-location" placeholder="Ex : Salle des fêtes, Cocody" value="${escapeHtml(data.eventLocation)||''}"></div>
-        <label>Heure de l'événement</label>
-        <div class="field-wrap"><span class="material-symbols-outlined">schedule</span>
-          <input type="time" id="ev-time" value="${data.eventTime||''}"></div>
-        <div id="ev-ok" class="banner ok" style="display:none;margin-top:14px;">Détails enregistrés.</div>
-        <div class="stack">
-          <button class="btn btn-ghost btn-block" id="btn-save-event">Enregistrer le lieu et l'heure</button>
-        </div>
-      </div>` : ''}
     `;
     const scaler = document.getElementById('page-scaler');
     scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig}, 'view');
@@ -1039,19 +1060,6 @@ async function renderContractView(id, isAdmin){
       renderHiddenPagesForPDF(data, {presta:data.prestaSig, client:data.clientSig});
       await generatePDF(`Contrat_${(data.clientName||'client').replace(/\s+/g,'_')}_signe.pdf`);
       dlBtn.disabled=false; dlBtn.innerHTML='<span class="material-symbols-outlined">download</span> Télécharger le PDF signé';
-    });
-    const saveEvBtn = document.getElementById('btn-save-event');
-    if(saveEvBtn) saveEvBtn.addEventListener('click', async ()=>{
-      data.eventLocation = document.getElementById('ev-location').value.trim();
-      data.eventTime = document.getElementById('ev-time').value;
-      saveEvBtn.disabled = true; saveEvBtn.textContent = 'Enregistrement...';
-      const ok = await saveContract(id, data);
-      saveEvBtn.disabled = false; saveEvBtn.textContent = "Enregistrer le lieu et l'heure";
-      if(ok){
-        const okBox = document.getElementById('ev-ok');
-        okBox.style.display = 'flex';
-        setTimeout(()=>{ okBox.style.display = 'none'; }, 2500);
-      }
     });
     return;
   }
