@@ -660,30 +660,34 @@ async function renderEvents(){
   function eventCard(r){
     const d = r.data;
     const dateLong = formatDateLong(d.prestationDate) || 'Date non renseignée';
+    const hasEvent = d.eventLocation || d.eventTime;
     return `
       <div class="card" style="margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-          <div>
-            <p class="row-title" style="margin:0 0 2px;">${dateLong} — ${escapeHtml(d.clientName)||'Sans nom'}</p>
-            <p class="row-sub" style="margin:0;">${fcfa(d.totalAmount)}</p>
-          </div>
-          <button class="btn btn-ghost btn-sm view-contract-btn" data-id="${r.id}" style="width:auto;padding:7px 12px;font-size:12px;white-space:nowrap;">Voir le contrat</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <p class="row-title" style="margin:0;">${dateLong} — ${escapeHtml(d.clientName)||'Sans nom'}</p>
+          <button class="ev-toggle" data-id="${r.id}" aria-label="Afficher les détails" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface-alt);color:var(--orange);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
         </div>
-        <div class="row2" style="margin-top:14px;">
-          <div>
-            <label style="margin-top:0;">Lieu de l'événement</label>
-            <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
-              <input type="text" class="ev-loc" data-id="${r.id}" placeholder="Ex : Salle des fêtes, Cocody" value="${escapeHtml(d.eventLocation)||''}"></div>
+        <p class="row-sub ev-summary" data-id="${r.id}" style="margin:6px 0 0;${hasEvent ? '' : 'display:none;'}">${escapeHtml(d.eventLocation)||''}${d.eventLocation && d.eventTime ? ' · ' : ''}${escapeHtml(d.eventTime)||''}</p>
+
+        <div class="ev-expand" data-id="${r.id}" style="display:none;margin-top:14px;">
+          <p class="row-sub" style="margin:0 0 12px;">${fcfa(d.totalAmount)}</p>
+          <div class="row2">
+            <div>
+              <label style="margin-top:0;">Lieu de l'événement</label>
+              <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
+                <input type="text" class="ev-loc" data-id="${r.id}" placeholder="Ex : Salle des fêtes, Cocody" value="${escapeHtml(d.eventLocation)||''}"></div>
+            </div>
+            <div>
+              <label style="margin-top:0;">Heure</label>
+              <div class="field-wrap"><span class="material-symbols-outlined">schedule</span>
+                <input type="time" class="ev-time" data-id="${r.id}" value="${d.eventTime||''}"></div>
+            </div>
           </div>
-          <div>
-            <label style="margin-top:0;">Heure</label>
-            <div class="field-wrap"><span class="material-symbols-outlined">schedule</span>
-              <input type="time" class="ev-time" data-id="${r.id}" value="${d.eventTime||''}"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;">
+            <button class="btn btn-primary save-ev-btn" data-id="${r.id}" style="width:auto;padding:9px 16px;font-size:13px;">Enregistrer</button>
+            <button class="btn btn-ghost btn-sm view-contract-btn" data-id="${r.id}" style="width:auto;padding:9px 14px;font-size:13px;">Voir le contrat</button>
+            <span class="ev-saved" data-id="${r.id}" style="display:none;color:#217a41;font-size:13px;font-weight:600;">✓ Enregistré</span>
           </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
-          <button class="btn btn-primary save-ev-btn" data-id="${r.id}" style="width:auto;padding:9px 16px;font-size:13px;">Enregistrer</button>
-          <span class="ev-saved" data-id="${r.id}" style="display:none;color:#217a41;font-size:13px;font-weight:600;">✓ Enregistré</span>
         </div>
       </div>`;
   }
@@ -706,6 +710,15 @@ async function renderEvents(){
     ` : ''}
   `;
 
+  document.querySelectorAll('.ev-toggle').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.dataset.id;
+      const panel = document.querySelector(`.ev-expand[data-id="${id}"]`);
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      b.textContent = isOpen ? '+' : '–';
+    });
+  });
   document.querySelectorAll('.view-contract-btn').forEach(b=>{
     b.addEventListener('click', ()=> go({id: b.dataset.id, admin:'1'}));
   });
@@ -714,8 +727,10 @@ async function renderEvents(){
       const id = b.dataset.id;
       const row = rows.find(r => r.id === id);
       if(!row) return;
-      row.data.eventLocation = document.querySelector(`.ev-loc[data-id="${id}"]`).value.trim();
-      row.data.eventTime = document.querySelector(`.ev-time[data-id="${id}"]`).value;
+      const loc = document.querySelector(`.ev-loc[data-id="${id}"]`).value.trim();
+      const time = document.querySelector(`.ev-time[data-id="${id}"]`).value;
+      row.data.eventLocation = loc;
+      row.data.eventTime = time;
       b.disabled = true; b.textContent = 'Enregistrement...';
       const ok = await saveContract(id, row.data);
       b.disabled = false; b.textContent = 'Enregistrer';
@@ -723,6 +738,9 @@ async function renderEvents(){
         const saved = document.querySelector(`.ev-saved[data-id="${id}"]`);
         saved.style.display = 'inline';
         setTimeout(()=>{ saved.style.display = 'none'; }, 2000);
+        const summary = document.querySelector(`.ev-summary[data-id="${id}"]`);
+        summary.textContent = `${loc}${loc && time ? ' · ' : ''}${time}`;
+        summary.style.display = (loc || time) ? 'block' : 'none';
       }
     });
   });
