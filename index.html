@@ -203,6 +203,7 @@
   .sign-col .note{font-size:11px;color:#777;margin-bottom:10px;}
   .sign-img{height:70px;max-width:100%;object-fit:contain;}
   .sign-typed{font-family:'Segoe Script','Brush Script MT',cursive;font-size:26px;padding-top:10px;}
+  .printed-name{font-size:12px;font-weight:700;margin-top:6px;border-top:1px solid #999;padding-top:5px;}
   .faitle{text-align:center;font-weight:800;margin:26px 0 4px;font-size:14px;}
   .p-footer{
     position:absolute;bottom:0;left:0;right:0;background:#1a1a1a;color:#fff;
@@ -243,14 +244,15 @@ const SUPABASE_KEY = "sb_publishable_tIbcG-hbvNUop9Wy0TAixg_da9y5ox8";
 const SUPABASE_TABLE = "cp_contracts";
 
 /* ================= AUTHENTIFICATION MC (accès admin uniquement) ================= */
-/* Identifiants simples côté client : suffisant pour empêcher un visiteur lambda
-   d'ouvrir le tableau de bord, mais visibles dans le code source du site.
+/* Le MC crée lui-même son identifiant/mot de passe au premier accès ; ils sont
+   stockés dans Supabase (comme les contrats) afin de fonctionner sur n'importe quel appareil.
    Le lien client (?id=...) n'est jamais concerné par ce login. */
-const MC_USERNAME = "nogbou";
-const MC_PASSWORD = "MCdeReve2026";
+const ACCOUNT_ID = "__mc_account__";
 const AUTH_KEY = "mc_de_reve_auth";
 function isAuthed(){ return localStorage.getItem(AUTH_KEY) === 'ok'; }
 function setAuthed(v){ if(v) localStorage.setItem(AUTH_KEY,'ok'); else localStorage.removeItem(AUTH_KEY); }
+async function loadAccount(){ return await loadContract(ACCOUNT_ID); }
+async function saveAccount(username, password){ return await saveContract(ACCOUNT_ID, {username, password}); }
 
 /* ================= UTILITAIRES ================= */
 function genId(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
@@ -292,7 +294,7 @@ function route(){
   if(needsAuth && !isAuthed()){
     backBtn.style.display = 'none';
     if(avatar) avatar.style.display = 'none';
-    renderLogin();
+    renderAuthGate();
     return;
   }
   if(avatar) avatar.style.display = (id && !admin) ? 'none' : 'flex';
@@ -316,8 +318,52 @@ document.getElementById('avatar-btn').addEventListener('click', ()=>{
   if(confirm('Se déconnecter ?')){ setAuthed(false); go({}); }
 });
 
-/* ================= VUE : CONNEXION MC ================= */
-function renderLogin(){
+/* ================= VUE : CONNEXION / CRÉATION DE COMPTE MC ================= */
+async function renderAuthGate(){
+  content.innerHTML = `<div class="empty">Chargement…</div>`;
+  const account = await loadAccount();
+  if(!account){ renderCreateAccount(); }
+  else { renderLogin(account); }
+}
+
+function renderCreateAccount(){
+  content.innerHTML = `
+    <div class="card" style="max-width:380px;margin:40px auto;">
+      <h2 style="margin:0 0 4px;font-size:22px;">Créer votre accès</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 4px;">Première visite : choisis l'identifiant et le mot de passe qui te serviront à te connecter à ton espace prestataire.</p>
+      <label>Identifiant</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">person</span>
+        <input type="text" id="acc-user" placeholder="Ex : nogbou"></div>
+      <label>Mot de passe</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
+        <input type="text" id="acc-pass" placeholder="Choisis un mot de passe"></div>
+      <label>Confirmer le mot de passe</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
+        <input type="text" id="acc-pass2" placeholder="Retape le mot de passe"></div>
+      <div id="acc-err" class="banner err" style="display:none;margin-top:14px;"></div>
+      <div class="stack">
+        <button class="btn btn-primary btn-block" id="btn-create-account">Créer mon compte</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('btn-create-account').addEventListener('click', async ()=>{
+    const u = document.getElementById('acc-user').value.trim();
+    const p = document.getElementById('acc-pass').value;
+    const p2 = document.getElementById('acc-pass2').value;
+    const errBox = document.getElementById('acc-err');
+    if(!u || !p){ errBox.textContent = 'Merci de renseigner un identifiant et un mot de passe.'; errBox.style.display='flex'; return; }
+    if(p !== p2){ errBox.textContent = 'Les deux mots de passe ne correspondent pas.'; errBox.style.display='flex'; return; }
+    const btn = document.getElementById('btn-create-account');
+    btn.disabled = true; btn.textContent = 'Création...';
+    const ok = await saveAccount(u, p);
+    btn.disabled = false; btn.textContent = 'Créer mon compte';
+    if(!ok){ errBox.textContent = "Erreur lors de la création du compte, réessaie."; errBox.style.display='flex'; return; }
+    setAuthed(true);
+    route();
+  });
+}
+
+function renderLogin(account){
   content.innerHTML = `
     <div class="card" style="max-width:380px;margin:40px auto;">
       <h2 style="margin:0 0 4px;font-size:22px;">Connexion</h2>
@@ -327,7 +373,7 @@ function renderLogin(){
         <input type="text" id="login-user" placeholder="Identifiant"></div>
       <label>Mot de passe</label>
       <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
-        <input type="text" id="login-pass" placeholder="Mot de passe" style="-webkit-text-security:disc;text-security:disc;"></div>
+        <input type="text" id="login-pass" placeholder="Mot de passe"></div>
       <div id="login-err" class="banner err" style="display:none;margin-top:14px;">Identifiant ou mot de passe incorrect.</div>
       <div class="stack">
         <button class="btn btn-primary btn-block" id="btn-login">Se connecter</button>
@@ -337,7 +383,7 @@ function renderLogin(){
   function tryLogin(){
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
-    if(u === MC_USERNAME && p === MC_PASSWORD){
+    if(u === account.username && p === account.password){
       setAuthed(true);
       route();
     } else {
@@ -380,7 +426,8 @@ async function listContracts(){
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
     if(!res.ok) return [];
-    return await res.json();
+    const rows = await res.json();
+    return rows.filter(r => r.id !== ACCOUNT_ID);
   }catch(e){ return []; }
 }
 
@@ -674,8 +721,8 @@ function contractHTML(d, sig, idPrefix){
       <div class="divider" style="margin-top:26px;"></div>
       <div class="faitle">Fait à <span class="fillblank">${escapeHtml(d.lieu)||'____________'}</span> le <span class="fillblank">${sDate || '____________'}</span></div>
       <div class="sign-block">
-        <div class="sign-col"><div class="label">Prestataire :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${prestaSig}</div>
-        <div class="sign-col"><div class="label">Client :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${clientSig}</div>
+        <div class="sign-col"><div class="label">Prestataire :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${prestaSig}<div class="printed-name">Jean Jaurès NOGBOU</div></div>
+        <div class="sign-col"><div class="label">Client :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${clientSig}<div class="printed-name">${escapeHtml(d.clientName)||''}</div></div>
       </div>
     </div>
     <div class="p-footer"><div class="flogo"><div class="fdot">CP</div><span>CREATIVE PLANNER</span></div><div>${CONTACT_TEL}</div><div>${CONTACT_MAIL}</div></div>
@@ -851,6 +898,10 @@ async function renderContractView(id, isAdmin){
     <div class="card">
       <h2 style="margin:0 0 4px;font-size:19px;">Votre signature</h2>
       <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 4px;">En signant, tu certifies avoir lu et approuvé ce contrat.</p>
+      <label>Nom complet</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">person</span>
+        <input type="text" id="client-name-confirm" placeholder="Ton nom et prénom" value="${escapeHtml(data.clientName)||''}"></div>
+      <label style="margin-top:20px;">Signature</label>
       <div class="sig-tabs">
         <div class="sig-tab active" data-tab="draw-client">Dessiner ma signature</div>
         <div class="sig-tab" data-tab="type-client">Taper mon nom</div>
@@ -884,6 +935,9 @@ async function renderContractView(id, isAdmin){
   document.getElementById('clear-client').addEventListener('click', ()=>clientPad.clear());
 
   document.getElementById('btn-sign').addEventListener('click', async ()=>{
+    const clientName = document.getElementById('client-name-confirm').value.trim();
+    if(!clientName){ alert('Merci de renseigner ton nom complet avant de signer.'); return; }
+
     const drawActive = document.getElementById('draw-client').classList.contains('active');
     let clientSig = null;
     if(drawActive){
@@ -897,6 +951,7 @@ async function renderContractView(id, isAdmin){
     const btn = document.getElementById('btn-sign');
     btn.disabled = true; btn.innerHTML = 'Signature en cours...';
 
+    data.clientName = clientName;
     data.clientSig = clientSig;
     data.status = 'signed';
     data.signedAt = Date.now();
