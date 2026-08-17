@@ -703,26 +703,26 @@ async function renderCreate(editId){
       <h2 style="margin:0 0 4px;font-size:23px;">${editId ? 'Modifier le brouillon' : 'Nouveau Contrat de Prestation'}</h2>
       <p style="color:var(--ink-soft);font-size:14px;margin:0 0 4px;">Saisis les informations du/de la client(e) pour préparer le document.</p>
 
-      <label>Nom complet du/de la client(e)</label>
+      <label>Nom complet du/de la client(e) *</label>
       <div class="field-wrap"><span class="material-symbols-outlined">person</span>
-        <input type="text" id="f-name" placeholder="Ex : Aïcha KOFFI" value="${escapeHtml(d.clientName)||''}"></div>
+        <input type="text" id="f-name" placeholder="Ex : Aïcha KOFFI" value="${escapeHtml(d.clientName)||''}" required></div>
 
-      <label>Montant total de la prestation (FCFA)</label>
+      <label>Montant total de la prestation (FCFA) *</label>
       <div class="field-wrap"><span class="material-symbols-outlined">payments</span>
-        <input type="number" id="f-amount" placeholder="Ex : 250000" value="${d.totalAmount||''}"></div>
+        <input type="number" id="f-amount" placeholder="Ex : 250000" value="${d.totalAmount||''}" required></div>
       <div class="hint" id="acompte-hint">Acompte (50%) : ${d.totalAmount ? fcfa(d.totalAmount/2) : '—'}</div>
 
-      <label>Date de la prestation</label>
+      <label>Date de la prestation *</label>
       <div class="field-wrap"><span class="material-symbols-outlined">event</span>
-        <input type="date" id="f-pdate" value="${d.prestationDate||''}"></div>
+        <input type="date" id="f-pdate" value="${d.prestationDate||''}" required></div>
 
-      <label>Lieu de signature ("Fait à ...")</label>
+      <label>Lieu de signature ("Fait à ...") *</label>
       <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
-        <input type="text" id="f-lieu" placeholder="Ex : Abidjan" value="${escapeHtml(d.lieu)||''}"></div>
+        <input type="text" id="f-lieu" placeholder="Ex : Abidjan" value="${escapeHtml(d.lieu)||''}" required></div>
 
-      <label>Date de signature du contrat</label>
+      <label>Date de signature du contrat *</label>
       <div class="field-wrap"><span class="material-symbols-outlined">event</span>
-        <input type="date" id="f-sdate" value="${d.signDate||''}"></div>
+        <input type="date" id="f-sdate" value="${d.signDate||''}" required></div>
 
       <div class="divider"></div>
 
@@ -803,7 +803,16 @@ async function renderCreate(editId){
 
   document.getElementById('btn-generate').addEventListener('click', async ()=>{
     const f = collect();
-    if(!f.clientName || !f.totalAmount){ alert('Merci de renseigner au moins le nom du client et le montant.'); return; }
+    const missing = [];
+    if(!f.clientName) missing.push('le nom du/de la client(e)');
+    if(!f.totalAmount) missing.push('le montant');
+    if(!f.prestationDate) missing.push('la date de la prestation');
+    if(!f.lieu) missing.push('le lieu de signature');
+    if(!f.signDate) missing.push('la date de signature');
+    if(missing.length){
+      alert('Merci de renseigner tous les champs obligatoires avant de générer le contrat :\n- ' + missing.join('\n- '));
+      return;
+    }
 
     const id = editId || genId();
     const data = { ...f, status:'pending', clientSig: existing?existing.clientSig:null, createdAt: existing?existing.createdAt:Date.now() };
