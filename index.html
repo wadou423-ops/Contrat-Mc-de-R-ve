@@ -283,6 +283,7 @@ function go(params){
 window.addEventListener('popstate', route);
 
 function route(){
+  clearPolling();
   const id = getParam('id');
   const view = getParam('view');
   const admin = getParam('admin') === '1';
@@ -308,15 +309,94 @@ function route(){
   } else if(view === 'list'){
     backBtn.style.display = 'flex';
     renderList();
+  } else if(view === 'account'){
+    backBtn.style.display = 'flex';
+    renderAccountSettings();
   } else {
     backBtn.style.display = 'none';
     renderDashboard();
   }
 }
 document.getElementById('back-btn').addEventListener('click', ()=> go({}));
-document.getElementById('avatar-btn').addEventListener('click', ()=>{
-  if(confirm('Se déconnecter ?')){ setAuthed(false); go({}); }
-});
+document.getElementById('avatar-btn').addEventListener('click', ()=> go({view:'account'}));
+
+/* ================= POLLING (mise à jour auto quand le client signe) ================= */
+let pollTimer = null;
+function clearPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+function startPollingForSignature(id){
+  clearPolling();
+  pollTimer = setInterval(async ()=>{
+    const fresh = await loadContract(id);
+    if(fresh && fresh.status === 'signed'){
+      clearPolling();
+      renderContractView(id, true);
+    }
+  }, 5000);
+}
+
+/* ================= VUE : MES ACCÈS (déconnexion + modification identifiants) ================= */
+async function renderAccountSettings(){
+  content.innerHTML = `<div class="empty">Chargement…</div>`;
+  const account = await loadAccount();
+  content.innerHTML = `
+    <div class="page-title" style="font-size:23px;">Mes accès</div>
+    <div class="page-sub">Gère ton identifiant et ton mot de passe de connexion.</div>
+
+    <div class="card">
+      <label>Identifiant</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">person</span>
+        <input type="text" id="acc-user" value="${escapeHtml(account?account.username:'')}"></div>
+
+      <label>Nouveau mot de passe</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
+        <input type="text" id="acc-pass" placeholder="Laisser vide pour ne pas changer"></div>
+
+      <label>Confirmer le nouveau mot de passe</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
+        <input type="text" id="acc-pass2" placeholder="Laisser vide pour ne pas changer"></div>
+
+      <div id="acc-err" class="banner err" style="display:none;margin-top:14px;"></div>
+      <div id="acc-ok" class="banner ok" style="display:none;margin-top:14px;">Identifiants mis à jour.</div>
+
+      <div class="stack">
+        <button class="btn btn-primary btn-block" id="btn-save-account">Enregistrer les modifications</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="btn btn-ghost btn-block" id="btn-logout">
+        <span class="material-symbols-outlined">logout</span> Se déconnecter
+      </button>
+    </div>
+  `;
+
+  document.getElementById('btn-save-account').addEventListener('click', async ()=>{
+    const u = document.getElementById('acc-user').value.trim();
+    const p = document.getElementById('acc-pass').value;
+    const p2 = document.getElementById('acc-pass2').value;
+    const errBox = document.getElementById('acc-err');
+    const okBox = document.getElementById('acc-ok');
+    errBox.style.display = 'none'; okBox.style.display = 'none';
+    if(!u){ errBox.textContent = "Merci de renseigner un identifiant."; errBox.style.display='flex'; return; }
+    if(p || p2){
+      if(p !== p2){ errBox.textContent = "Les deux mots de passe ne correspondent pas."; errBox.style.display='flex'; return; }
+    }
+    const finalPassword = p ? p : (account ? account.password : '');
+    const btn = document.getElementById('btn-save-account');
+    btn.disabled = true; btn.textContent = 'Enregistrement...';
+    const ok = await saveAccount(u, finalPassword);
+    btn.disabled = false; btn.textContent = 'Enregistrer les modifications';
+    if(!ok){ errBox.textContent = "Erreur lors de l'enregistrement, réessaie."; errBox.style.display='flex'; return; }
+    document.getElementById('acc-pass').value = '';
+    document.getElementById('acc-pass2').value = '';
+    okBox.style.display = 'flex';
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', ()=>{
+    setAuthed(false);
+    go({});
+  });
+}
 
 /* ================= VUE : CONNEXION / CRÉATION DE COMPTE MC ================= */
 async function renderAuthGate(){
@@ -492,6 +572,10 @@ async function renderDashboard(){
   const seeAll = document.getElementById('btn-see-all');
   if(seeAll) seeAll.addEventListener('click', ()=> go({view:'list'}));
   bindRowClicks();
+
+  if(rows.some(r => r.data.status === 'pending')){
+    pollTimer = setInterval(renderDashboard, 8000);
+  }
 }
 
 function rowHTML(r){
@@ -828,7 +912,7 @@ async function renderContractView(id, isAdmin){
             <button class="btn btn-success btn-block" id="btn-download">
               <span class="material-symbols-outlined">download</span> Télécharger le PDF signé
             </button>` : `
-            <div class="banner warn"><span class="material-symbols-outlined" style="font-size:17px;">hourglass_empty</span> En attente de signature du/de la client(e).</div>
+            <div class="banner warn"><span class="material-symbols-outlined" style="font-size:17px;">hourglass_empty</span> En attente de signature du/de la client(e). Cette page se met à jour automatiquement dès qu'il/elle signe.</div>
           `}
         `}
       </div>
@@ -837,6 +921,8 @@ async function renderContractView(id, isAdmin){
     scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig}, 'view');
     fitPages(document.getElementById('pages-wrap'));
     window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
+
+    if(data.status === 'pending'){ startPollingForSignature(id); }
 
     const contBtn = document.getElementById('btn-continue');
     if(contBtn) contBtn.addEventListener('click', ()=> go({view:'new', edit:id}));
