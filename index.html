@@ -116,7 +116,7 @@
   label:first-of-type{margin-top:0;}
   .field-wrap{position:relative;}
   .field-wrap .material-symbols-outlined{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:19px;}
-  input[type=text],input[type=number]{
+  input[type=text],input[type=number],input[type=date]{
     width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--border);border-radius:10px;
     font-size:15px;background:var(--surface-alt);color:var(--ink);font-family:inherit;
   }
@@ -227,7 +227,7 @@
       </button>
       <span class="brand">Mon MC de Rêve</span>
     </div>
-    <div class="avatar">CP</div>
+    <div class="avatar" id="avatar-btn" title="Se déconnecter" style="cursor:pointer;">CP</div>
   </div>
   <div class="content" id="content"></div>
 </div>
@@ -242,6 +242,16 @@ const SUPABASE_URL = "https://mbfgccqeuhnacyueoani.supabase.co";
 const SUPABASE_KEY = "sb_publishable_tIbcG-hbvNUop9Wy0TAixg_da9y5ox8";
 const SUPABASE_TABLE = "cp_contracts";
 
+/* ================= AUTHENTIFICATION MC (accès admin uniquement) ================= */
+/* Identifiants simples côté client : suffisant pour empêcher un visiteur lambda
+   d'ouvrir le tableau de bord, mais visibles dans le code source du site.
+   Le lien client (?id=...) n'est jamais concerné par ce login. */
+const MC_USERNAME = "nogbou";
+const MC_PASSWORD = "MCdeReve2026";
+const AUTH_KEY = "mc_de_reve_auth";
+function isAuthed(){ return localStorage.getItem(AUTH_KEY) === 'ok'; }
+function setAuthed(v){ if(v) localStorage.setItem(AUTH_KEY,'ok'); else localStorage.removeItem(AUTH_KEY); }
+
 /* ================= UTILITAIRES ================= */
 function genId(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
 function fcfa(n){ n = Number(n)||0; return n.toLocaleString('fr-FR') + ' FCFA'; }
@@ -251,6 +261,14 @@ function shareLink(id){ const url = new URL(window.location.href); url.search=''
 function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(ts){ if(!ts) return '—'; return new Date(ts).toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}); }
 function refCode(id){ return 'MC-' + (id||'').slice(0,6).toUpperCase(); }
+function formatDateLong(iso){
+  if(!iso) return '';
+  const parts = iso.split('-');
+  if(parts.length!==3) return iso;
+  const dt = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
+  if(isNaN(dt.getTime())) return iso;
+  return dt.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+}
 
 /* ================= ROUTER ================= */
 function go(params){
@@ -267,6 +285,18 @@ function route(){
   const view = getParam('view');
   const admin = getParam('admin') === '1';
   const backBtn = document.getElementById('back-btn');
+  const avatar = document.getElementById('avatar-btn');
+
+  // Le lien envoyé au client (?id=... sans admin=1) reste toujours public.
+  const needsAuth = !(id && !admin);
+  if(needsAuth && !isAuthed()){
+    backBtn.style.display = 'none';
+    if(avatar) avatar.style.display = 'none';
+    renderLogin();
+    return;
+  }
+  if(avatar) avatar.style.display = (id && !admin) ? 'none' : 'flex';
+
   if(id){
     backBtn.style.display = admin ? 'flex' : 'none';
     renderContractView(id, admin);
@@ -282,6 +312,41 @@ function route(){
   }
 }
 document.getElementById('back-btn').addEventListener('click', ()=> go({}));
+document.getElementById('avatar-btn').addEventListener('click', ()=>{
+  if(confirm('Se déconnecter ?')){ setAuthed(false); go({}); }
+});
+
+/* ================= VUE : CONNEXION MC ================= */
+function renderLogin(){
+  content.innerHTML = `
+    <div class="card" style="max-width:380px;margin:40px auto;">
+      <h2 style="margin:0 0 4px;font-size:22px;">Connexion</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 4px;">Espace réservé au prestataire.</p>
+      <label>Identifiant</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">person</span>
+        <input type="text" id="login-user" placeholder="Identifiant"></div>
+      <label>Mot de passe</label>
+      <div class="field-wrap"><span class="material-symbols-outlined">lock</span>
+        <input type="text" id="login-pass" placeholder="Mot de passe" style="-webkit-text-security:disc;text-security:disc;"></div>
+      <div id="login-err" class="banner err" style="display:none;margin-top:14px;">Identifiant ou mot de passe incorrect.</div>
+      <div class="stack">
+        <button class="btn btn-primary btn-block" id="btn-login">Se connecter</button>
+      </div>
+    </div>
+  `;
+  function tryLogin(){
+    const u = document.getElementById('login-user').value.trim();
+    const p = document.getElementById('login-pass').value;
+    if(u === MC_USERNAME && p === MC_PASSWORD){
+      setAuthed(true);
+      route();
+    } else {
+      document.getElementById('login-err').style.display = 'flex';
+    }
+  }
+  document.getElementById('btn-login').addEventListener('click', tryLogin);
+  document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') tryLogin(); });
+}
 
 /* ================= STORAGE (Supabase REST) ================= */
 async function saveContract(id, data){
@@ -436,21 +501,16 @@ async function renderCreate(editId){
       <div class="hint" id="acompte-hint">Acompte (50%) : ${d.totalAmount ? fcfa(d.totalAmount/2) : '—'}</div>
 
       <label>Date de la prestation</label>
-      <div class="row2">
-        <input type="number" id="f-pday" placeholder="Jour" min="1" max="31" value="${d.prestationDay||''}">
-        <input type="number" id="f-pmonth" placeholder="Mois" min="1" max="12" value="${d.prestationMonth||''}">
-      </div>
-      <div class="hint">Année fixée à 2026, comme sur le modèle.</div>
+      <div class="field-wrap"><span class="material-symbols-outlined">event</span>
+        <input type="date" id="f-pdate" value="${d.prestationDate||''}"></div>
 
       <label>Lieu de signature ("Fait à ...")</label>
       <div class="field-wrap"><span class="material-symbols-outlined">location_on</span>
         <input type="text" id="f-lieu" placeholder="Ex : Abidjan" value="${escapeHtml(d.lieu)||''}"></div>
 
       <label>Date de signature du contrat</label>
-      <div class="row2">
-        <input type="number" id="f-sday" placeholder="Jour" min="1" max="31" value="${d.signDay||''}">
-        <input type="number" id="f-smonth" placeholder="Mois" min="1" max="12" value="${d.signMonth||''}">
-      </div>
+      <div class="field-wrap"><span class="material-symbols-outlined">event</span>
+        <input type="date" id="f-sdate" value="${d.signDate||''}"></div>
 
       <div class="divider"></div>
 
@@ -501,11 +561,9 @@ async function renderCreate(editId){
   function collect(){
     const clientName = document.getElementById('f-name').value.trim();
     const totalAmount = Number(document.getElementById('f-amount').value);
-    const prestationDay = document.getElementById('f-pday').value;
-    const prestationMonth = document.getElementById('f-pmonth').value;
+    const prestationDate = document.getElementById('f-pdate').value;
     const lieu = document.getElementById('f-lieu').value.trim();
-    const signDay = document.getElementById('f-sday').value;
-    const signMonth = document.getElementById('f-smonth').value;
+    const signDate = document.getElementById('f-sdate').value;
 
     let prestaSig = existing ? existing.prestaSig : null;
     const drawActive = document.getElementById('draw-presta').classList.contains('active');
@@ -515,7 +573,7 @@ async function renderCreate(editId){
       const typed = document.getElementById('presta-typed').value.trim();
       if(typed) prestaSig = {type:'typed', data: typed};
     }
-    return {clientName, totalAmount, prestationDay, prestationMonth, lieu, signDay, signMonth, prestaSig};
+    return {clientName, totalAmount, prestationDate, lieu, signDate, prestaSig};
   }
 
   document.getElementById('btn-draft').addEventListener('click', async ()=>{
@@ -562,11 +620,14 @@ async function renderCreate(editId){
 }
 
 /* ================= RENDU DU CONTRAT (2 pages) — INCHANGÉ ================= */
-function contractHTML(d, sig){
+function contractHTML(d, sig, idPrefix){
+  idPrefix = idPrefix || 'pdf';
   const prestaSig = renderSigBox(sig.presta);
   const clientSig = renderSigBox(sig.client);
+  const pDate = formatDateLong(d.prestationDate);
+  const sDate = formatDateLong(d.signDate);
   return `
-  <div class="page" id="pdf-page-1">
+  <div class="page" id="${idPrefix}-page-1">
     <div class="p-header"><div class="mono">✒</div><h1>CREATIVE PLANNER</h1></div>
     <div class="p-title"><h2>CONTRAT DE PRESTATION</h2><div class="subtitle">MAITRE DE CEREMONIE</div></div>
     <div class="p-body">
@@ -578,7 +639,7 @@ function contractHTML(d, sig){
       <div class="divider"></div>
       <h3 class="art">Article 1 : Objet du contrat</h3>
       <p>Le présent contrat a pour objet de définir les termes et conditions dans lesquels le Prestataire s'engage à fournir au / à la Client(e) une prestation de services en qualité de Maître de cérémonie. La prestation se déroulera le
-        <span class="fillblank">${pad2(d.prestationDay)}</span> / <span class="fillblank">${pad2(d.prestationMonth)}</span> / 2026, selon les modalités convenues entre les parties.</p>
+        <span class="fillblank">${pDate || '____________'}</span>, selon les modalités convenues entre les parties.</p>
       <h3 class="art">Article 2 : Obligation des Parties</h3>
       <p>1. Obligations du Prestataire</p>
       <p>Le Prestataire s'engage à assurer la prestation de Maître de cérémonie avec professionnalisme, diligence et conformément aux règles de l'art. À ce titre, il devra notamment :</p>
@@ -598,7 +659,7 @@ function contractHTML(d, sig){
     </div>
     <div class="p-footer"><div class="flogo"><div class="fdot">CP</div><span>CREATIVE PLANNER</span></div><div>${CONTACT_TEL}</div><div>${CONTACT_MAIL}</div></div>
   </div>
-  <div class="page" id="pdf-page-2">
+  <div class="page" id="${idPrefix}-page-2">
     <div class="p-body" style="padding-top:40px;">
       <h3 class="art" style="margin-top:0;">Article 3 : Rémunération</h3>
       <p>La Cliente s'engage à verser au Prestataire un montant total de <span class="fillblank">${fcfa(d.totalAmount)}</span> en contrepartie des services fournis au titre du présent contrat. Un acompte équivalent à cinquante pour cent (50 %) du montant total, soit la somme de <span class="fillblank">${fcfa(d.totalAmount/2)}</span>, devra être versé à la signature du présent contrat afin de valider la réservation de la date de la prestation.</p>
@@ -611,7 +672,7 @@ function contractHTML(d, sig){
       <h3 class="art">Article 6 : Litiges</h3>
       <p>En cas de litige relatif à l'interprétation ou à l'exécution du présent contrat, les parties s'efforceront de le résoudre à l'amiable. À défaut d'accord, le litige sera soumis à la juridiction compétente.</p>
       <div class="divider" style="margin-top:26px;"></div>
-      <div class="faitle">Fait à <span class="fillblank">${escapeHtml(d.lieu)||'____________'}</span> le <span class="fillblank">${pad2(d.signDay)}</span>/<span class="fillblank">${pad2(d.signMonth)}</span>/2026</div>
+      <div class="faitle">Fait à <span class="fillblank">${escapeHtml(d.lieu)||'____________'}</span> le <span class="fillblank">${sDate || '____________'}</span></div>
       <div class="sign-block">
         <div class="sign-col"><div class="label">Prestataire :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${prestaSig}</div>
         <div class="sign-col"><div class="label">Client :</div><div class="note">(signature précédée de la mention "Lu et approuvé")</div>${clientSig}</div>
@@ -726,7 +787,7 @@ async function renderContractView(id, isAdmin){
       </div>
     `;
     const scaler = document.getElementById('page-scaler');
-    scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig});
+    scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig}, 'view');
     fitPages(document.getElementById('pages-wrap'));
     window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
 
@@ -767,7 +828,7 @@ async function renderContractView(id, isAdmin){
       </div>
     `;
     const scaler = document.getElementById('page-scaler');
-    scaler.innerHTML = contractHTML(data, {presta:data.prestaSig, client:data.clientSig});
+    scaler.innerHTML = contractHTML(data, {presta:data.prestaSig, client:data.clientSig}, 'view');
     fitPages(document.getElementById('pages-wrap'));
     window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
     document.getElementById('btn-redownload').addEventListener('click', async (e)=>{
@@ -807,7 +868,7 @@ async function renderContractView(id, isAdmin){
   `;
 
   const scaler = document.getElementById('page-scaler');
-  scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig});
+  scaler.innerHTML = contractHTML(data, {presta: data.prestaSig, client: data.clientSig}, 'view');
   fitPages(document.getElementById('pages-wrap'));
   window.addEventListener('resize', ()=>fitPages(document.getElementById('pages-wrap')));
 
