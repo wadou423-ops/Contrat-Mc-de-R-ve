@@ -325,12 +325,19 @@ let pollTimer = null;
 function clearPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
 function startPollingForSignature(id){
   clearPolling();
+  let checking = false;
   pollTimer = setInterval(async ()=>{
-    const fresh = await loadContract(id);
-    if(fresh && fresh.status === 'signed'){
-      clearPolling();
-      renderContractView(id, true);
-    }
+    if(checking) return; // évite les vérifications qui se chevauchent
+    checking = true;
+    try{
+      const fresh = await loadContract(id);
+      if(fresh && fresh.status === 'signed'){
+        clearPolling();
+        // Rechargement complet plutôt qu'un re-rendu "à chaud" : garantit un état
+        // propre (pas d'éléments dupliqués) avant le téléchargement du PDF.
+        window.location.reload();
+      }
+    } finally { checking = false; }
   }, 5000);
 }
 
@@ -574,6 +581,7 @@ async function renderDashboard(){
   bindRowClicks();
 
   if(rows.some(r => r.data.status === 'pending')){
+    clearPolling();
     pollTimer = setInterval(renderDashboard, 8000);
   }
 }
